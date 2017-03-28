@@ -6,7 +6,7 @@ import pandas as pd
 from numpy.dual import lstsq
 
 
-def train(y):
+def train():
     df = pd.read_csv('./data/train.csv', na_values='NR', encoding='big5')
 
     days = df[u'日期'].unique()
@@ -27,25 +27,31 @@ def train(y):
         dfByDay = df[df[u'日期'].isin([day]) & df[u'測項'].isin(factors)].iloc[:, 3:]
         dfByDay.index = factors
         frames.append(dfByDay)
+
+    # 將橫軸各個指標的的 24h 照日期順序串起來 (1/1 AMB_TEMP + 1/ AMB_TEMP + ....)
+    # 最後會是 (指標數量, 24*天) 維的陣列
     training = pd.concat(frames, axis=1)
 
+    # 線性方程式的 x 應該在 col 的位子，所以將陣列轉置
     training = training.T
-    print(training, '\n\n')
-
+    print("training", training.shape)
     # 取九小時資料排成一排
     m = training.shape[0]
+    print("m", m)
     d = []
+    # sliding window count: 24*天 - 8(剩八必須得停)
     for i in range(0, m - 8):
+        # row i ~ row i + 8，產生 [9小時, 指標數] 的陣列
         x = training.iloc[i:i + 9]
+        # 將 [9小時, 指標數] 攤成 1 row
+        # => x11 +...+ x19 + x21 + ... + x29 + ... + xn1 + ... + xn9
         x = x.T.values.flatten()
+        # 所有 x 加入 d 後，d 便為 X * W + b 的 X matrix
         d.append(x)
-    # x = pd.DataFrame(d).T
-    # x['b'] = 1
-    # print('xt1', x)
-    y.append(training[8:]['PM2.5'].values.flatten())
-    # print("y", y);
-    # print('#x', x.shape[0])
-    return d
+
+    # y 為 第 10 個小時到 m - 9 小時的 array
+    output = training[8:]['PM2.5'].values.flatten()
+    return d, output
 
 training_epochs = 100000
 display_step = 10
@@ -67,14 +73,13 @@ with tf.Session() as sess:
     sess.run(init)
     trainX = []
     trainY = []
-    arrayX = []
-    arrayY = []
-    arrayX = (train(arrayY))
+    arrayX, arrayY = (train())
 
-    for (df_x, sr_y) in zip(np.asarray(arrayX), np.asarray(arrayY[0])):
+    for (df_x, sr_y) in zip(np.asarray(arrayX), np.asarray(arrayY)):
         trainX.append(np.asmatrix(df_x))
         trainY.append(np.asmatrix(sr_y))
 
+    # 以下為計算理論值 W & b
     tmpArrayX = pd.DataFrame(arrayX);
     tmpArrayX['b'] = 1
     arrayXWithB = tmpArrayX.as_matrix();
