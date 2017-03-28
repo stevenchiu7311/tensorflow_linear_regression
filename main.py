@@ -29,10 +29,8 @@ def prepare_data(df):
 
     # 線性方程式的 x 應該在 col 的位子，所以將陣列轉置
     training = training.T
-    print("training", training.shape)
     # 取九小時資料排成一排
     m = training.shape[0]
-    print("m", m)
     d = []
     # sliding window count: 24*天 - 8(剩八必須得停)
     for i in range(0, m - 8):
@@ -76,7 +74,7 @@ with tf.Session() as sess:
         trainX.append(np.asmatrix(df_x))
         trainY.append(np.asmatrix(sr_y))
 
-    # 以下為計算理論值 W & b
+    # 為預先準備理論最佳值 W & b
     tmpArrayX = pd.DataFrame(arrayX);
     tmpArrayX['b'] = 1
     arrayXWithB = tmpArrayX.as_matrix();
@@ -87,6 +85,7 @@ with tf.Session() as sess:
     print("WR:", WR, " size:", len(WR))
     print("lstsq:", np.sum(np.abs(np.subtract(np.asmatrix(arrayY).T, np.matmul(tmpArrayX, WR)))))
 
+    # 開始 train loop
     for epoch in range(training_epochs):
         for (x, y) in zip(trainX, trainY):
             sess.run(optimizer, feed_dict={X: x, Y: y})
@@ -96,14 +95,16 @@ with tf.Session() as sess:
             for (x, y) in zip(trainX, trainY):
                 tmp = sess.run(lossS, feed_dict={X: x, Y: y})
                 result += tmp
+            # 每 train 1000 次顯示 w & b result
             if epoch % (display_step * 100) == 0:
-                print("Training cost=", result, "\nW=", sess.run(W), "\nb=", sess.run(b), '\n')
+                print("Loss=", result, "\nW=", sess.run(W), "\nb=", sess.run(b), '\n')
             WP = np.vstack([sess.run(W), sess.run(b)])
             WE = np.sum(np.abs(np.subtract(WP, WR)))
-            print("epoch=", epoch, " WE=", WE, " Training cost=", result)
+            # 顯示 train 出來的 [w,b] 和 理論值的 vector 誤差 WE 以及 training error
+            print("epoch=", epoch, " WE=", WE, " Loss=", result)
         epoch = epoch + 1
 
     result = 0
     for (X, Y) in zip(trainX, trainY):
         result += sess.run(lossS, feed_dict={x: X, y: Y})
-    print("Final Training cost=", result, "W=", sess.run(W), "b=", sess.run(b), '\n')
+    print("Final Loss=", result, "W=", sess.run(W), "b=", sess.run(b), '\n')
