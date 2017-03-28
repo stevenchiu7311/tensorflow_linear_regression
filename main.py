@@ -5,23 +5,18 @@ import numpy as np
 import pandas as pd
 from numpy.dual import lstsq
 
+df = pd.read_csv('./data/train.csv', na_values='NR', encoding='big5')
 
-def train():
-    df = pd.read_csv('./data/train.csv', na_values='NR', encoding='big5')
+# Choose factors
+factors = df[u'測項'].unique()
+factors = np.delete(factors, 10) # delete('RAINFALL')
+# factors = [u'PM2.5']
+# factors = [u'PM10', u'PM2.5', u'NO2']
 
+def prepare_data(df):
     days = df[u'日期'].unique()
     test = days.shape[0]
-    print(test)
     days = days[:test]
-    # delete('RAINFALL')
-    factors = df[u'測項'].unique()
-    factors = np.delete(factors, 10)
-
-    # factors = [u'PM2.5']
-    # factors = [u'PM10', u'PM2.5', u'NO2']
-    # print(factors)
-    # print(days)
-
     frames = []
     for day in days:
         dfByDay = df[df[u'日期'].isin([day]) & df[u'測項'].isin(factors)].iloc[:, 3:]
@@ -53,27 +48,29 @@ def train():
     output = training[8:]['PM2.5'].values.flatten()
     return d, output
 
+# Variable for regression
 training_epochs = 100000
 display_step = 10
 learning_rate = 0.0000001
-X = tf.placeholder("float", [1, 153])
+X = tf.placeholder("float", [1, factors.shape[0] * 9])
 Y = tf.placeholder("float", [1, 1])
 # Set model weights
-W = tf.Variable(tf.zeros([153, 1]), name="weight")
+W = tf.Variable(tf.zeros([factors.shape[0] * 9, 1]), name="weight")
 
+# OP for regression
 b = tf.Variable(tf.zeros([1]), name="bias")
 predictedY = tf.add(tf.matmul(X, W), b)
 loss = tf.reduce_sum(tf.square((Y - predictedY)))
-lossS = tf.abs(Y - predictedY)
-
 optimizer = tf.train.GradientDescentOptimizer(learning_rate).minimize(loss)
+
+lossS = tf.abs(Y - predictedY)
 
 init = tf.global_variables_initializer()
 with tf.Session() as sess:
     sess.run(init)
     trainX = []
     trainY = []
-    arrayX, arrayY = (train())
+    arrayX, arrayY = (prepare_data(df))
 
     for (df_x, sr_y) in zip(np.asarray(arrayX), np.asarray(arrayY)):
         trainX.append(np.asmatrix(df_x))
