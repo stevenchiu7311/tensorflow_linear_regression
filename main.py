@@ -50,21 +50,37 @@ def prepare_data(df):
 training_epochs = 100000
 display_step = 10
 learning_rate = 0.0000001
-X = tf.placeholder("float", [1, factors.shape[0] * 9])
-Y = tf.placeholder("float", [1, 1])
+with tf.name_scope('InputData'):
+    X = tf.placeholder("float", [1, factors.shape[0] * 9], name="X")
+with tf.name_scope('LabelData'):
+    Y = tf.placeholder("float", [1, 1], name="Y")
 # Set model weights
 W = tf.Variable(tf.zeros([factors.shape[0] * 9, 1]), name="weight")
 
 # OP for regression
 b = tf.Variable(tf.zeros([1]), name="bias")
-predictedY = tf.add(tf.matmul(X, W), b)
-loss = tf.reduce_sum(tf.square((Y - predictedY)))
-optimizer = tf.train.GradientDescentOptimizer(learning_rate).minimize(loss)
+with tf.name_scope('Model'):
+    predictedY = tf.add(tf.matmul(X, W), b)
+with tf.name_scope('Loss'):
+    loss = tf.reduce_sum(tf.square((Y - predictedY)))
+with tf.name_scope('Gradient'):
+    optimizer = tf.train.GradientDescentOptimizer(learning_rate).minimize(loss)
 
 lossS = tf.abs(Y - predictedY)
 
+# Initializing the variables
 init = tf.global_variables_initializer()
+
+# Create a summary to monitor cost tensor
+tf.summary.scalar("loss", loss)
+
+# Merge all summaries into a single op
+merged_summary_op = tf.summary.merge_all()
+
 with tf.Session() as sess:
+    # $ tensorboard --logdir="C:\cms\tensorflow_linear_regression\summary" --port 6006
+    train_writer = tf.summary.FileWriter('summary', sess.graph)
+
     sess.run(init)
     trainX = []
     trainY = []
@@ -88,7 +104,8 @@ with tf.Session() as sess:
     # 開始 train loop
     for epoch in range(training_epochs):
         for (x, y) in zip(trainX, trainY):
-            sess.run(optimizer, feed_dict={X: x, Y: y})
+            _, summary = sess.run([optimizer, merged_summary_op], feed_dict={X: x, Y: y})
+            train_writer.add_summary(summary, epoch)
 
         if epoch % display_step == 0:
             result = 0
